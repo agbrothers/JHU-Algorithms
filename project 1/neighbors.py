@@ -1,6 +1,7 @@
-import numpy as np
-from tqdm import trange
+import numpy as np         ## for np.log2
+from tqdm import trange    ## for displaying loop progress
 
+## LOCAL PACKAGES
 import utils
 
 
@@ -22,9 +23,18 @@ class Node:
     ## OVERLOAD LESS THAN OPERATOR
     def __lt__(self, other):
         return self.dist < other.dist
+    
+    ## DISPLAY CONTENTS OF NODE WHEN PRINTING
+    def __repr__(self):
+        return f"node: ({self.dist}, {self.p1}, {self.p2})"
+    
+    ## DISPLAY CONTENTS OF NODE WHEN PRINTING
+    def __str__(self):
+        return f"({self.dist}, {self.p1}, {self.p2})"
 
 
-class MinHeap:
+## GENERIC HEAP
+class Heap:
 
     ## ARRAY BASED IMPLEMENTATION
     def __init__(self, m) -> None:
@@ -32,24 +42,24 @@ class MinHeap:
         self.comparisons = 0
         self.max_depth = int(np.log2(m))
 
-    def insert(self, node):
+    def insert(self, node, idx=None):
         if DEBUG: start = self.comparisons
         ## ADD NEW NODE TO BOTTOM OF TREE
-        self.array.append(node)
+        if idx is None:
+            self.array.append(node)
+        ## INSERT NEW NODE IN A SPECIFIC INDEX
+        else:
+            self.array[idx] = node
         ## HEAPIFY
-        self.heapify_up(self.size-1)
-        ## DROP NODES BEYOND THE MAX DEPTH
-        if self.depth > self.max_depth:
-            self.array = self.array[:self.size-1]
+        self.heapify_up(idx or self.size-1)
         if DEBUG: print(self.comparisons-start)
+        if DEBUG: assert self.depth <= self.max_depth
 
-    def get_min(self):
+    def get_root(self):
         if DEBUG: start = self.comparisons
         if self.empty(): raise Exception("ERROR: Can't get min from an empty heap!")
-        ## RETURN ROOT NODE (MINIMUM)
+        ## RETURN ROOT NODE
         node = self.array[0]
-        ## DEBUG CHECK
-        # if DEBUG: assert node.dist == min([i.dist for i in self.array])
         ## SWAP LAST NODE AND ROOT
         self.array[0] = self.array[self.size-1]
         ## REMOVE LAST NODE FROM TREE
@@ -89,10 +99,6 @@ class MinHeap:
         ## ELSE BASE CASE RETURN NONE
         return
     
-    def compare(self, parent_idx, child_idx):
-        self.comparisons += 1
-        return self.array[parent_idx] > self.array[child_idx]
-
     def swap(self, parent_idx, child_idx):
         temp = self.array[parent_idx]
         self.array[parent_idx] = self.array[child_idx]
@@ -109,26 +115,63 @@ class MinHeap:
     def depth(self):
         return int(np.log2(self.size))
 
+## MAX HEAP
+class MaxHeap(Heap):
 
+    def compare(self, parent_idx, child_idx):
+        ## TRUE IF PARENT IS LESS THAN CHILD (swap required)
+        self.comparisons += 1
+        return self.array[parent_idx] < self.array[child_idx]
 
+    def get_root(self):
+        if DEBUG: mx = max(self.array)
+        max_node = super().get_root()
+        if DEBUG: assert max_node == mx
+        return max_node
+
+## MIN HEAP
+class MinHeap(Heap):
+
+    def compare(self, parent_idx, child_idx):
+        ## TRUE IF PARENT IS GREATER THAN CHILD (swap required)
+        self.comparisons += 1
+        return self.array[parent_idx] > self.array[child_idx]
+
+    def insert(self, node, idx=None):
+        ## UPDATE THE NODE OBJECT IDX WHEN INSERTING
+        node.idx = self.size if idx is None else idx
+        super().insert(node, idx)
+
+    def swap(self, parent_idx, child_idx):
+        super().swap(parent_idx, child_idx)
+
+        ## UPDATE THE NODE OBJECT IDX WHEN SWAPPING
+        self.array[parent_idx].idx = parent_idx
+        self.array[child_idx].idx = child_idx
+
+    def get_root(self):
+        if DEBUG: mn = min(self.array)
+        min_node = super().get_root()
+        if DEBUG: assert min_node == mn
+        return min_node
 
 
 ## ALGORITHM
 
 def closest_pairs(p, m):
     ## INIT HEAP
-    heap = MinHeap(m)
+    min_heap = MinHeap(m)
+    max_heap = MaxHeap(m)
 
     comparisons = 0
 
     ## CHECK m
     n = len(p)
-    assert m <= utils.combinations(n), "ERROR: m is greater than the possible number of combinations of points given"
+    assert m <= utils.combinations(n), "ERROR: m is greater than the number of possible unique pairs of points"
 
     ## COMPUTE DIST BETWEEN EACH COMBINATION OF POINTS
     ## T(n) = \sum(n-1) -> M lg M  operation per step
-    ## np.sum(np.arange(10))
-    for i in trange(n):  # O(M log2 M) -> O(M log2 m) -> 
+    for i in trange(n):  # O(M log2 M) -> O(M log2 m) 
 
         for j in range(i+1,n):
 
@@ -139,169 +182,80 @@ def closest_pairs(p, m):
             ## CONSTRUCT NODE
             node = Node(dist, p[i], p[j])
             ## INSERT NODE INTO HEAP
-            heap.insert(node) ## TODO: DISCARD ANY NODE BELOW LEVEL M IN THE HEAP
+
+            min_start = min_heap.comparisons
+            max_start = max_heap.comparisons
+
+            ## WHEN > m ITEMS IN THE MIN HEAP, USE THE MAX HEAP 
+            ## TO GET THE INDEX OF THE MIN HEAP'S LARGEST NODE 
+            ## AND REPLACE IT WITH THE NEW NODE
+            insert_idx = None
+            if min_heap.size >= m:
+                max_node = max_heap.get_root()
+                insert_idx = max_node.idx
+                assert max_heap.comparisons - max_start < 2*np.log2(m)
+                max_start = max_heap.comparisons
+
+            ## MAY WANT TO INSERT THE NEW NODE INTO THE MAX HEAP AFTERWARDS
+            ## BOTH HEAPS CONTAIN ALL OF THE SAME NODES
+            max_heap.insert(node) 
+            min_heap.insert(node, insert_idx) 
+            assert min_heap.comparisons - min_start < np.log2(m)
+            assert max_heap.comparisons - max_start < np.log2(m)
 
     ## GET THE M CLOSEST PAIRS FROM THE HEAP
     pairs = []
     ## T(n) = m -> log m operations per step
     for i in trange(m): # O(m log2 M) -> O(m log2 m)
-        node = heap.get_min()  ## log2 m
+        node = min_heap.get_root()  ## log2 m
         # pairs.append((node.p1, node.p2))
         pairs.append(node)
 
-    comparisons += heap.comparisons
-    # print(comparisons)
+    comparisons += min_heap.comparisons
+    comparisons += max_heap.comparisons
+    if DEBUG: print(comparisons)
     return pairs, comparisons
 
 
-## ANALYSYS
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+def main(args):
 
-def test_worst_case(n=100):
-    cases = range(10, n+1, 10)
-    comparisons = []
-    m_cases = []
-    for n in cases:
+    n = args.n
+    m = args.m
+    simple = args.simple
+    
+    if simple == True:
+        p = utils.sample_p_flat(n)
+    else:
         p = utils.sample_p(n)
-        m = utils.combinations(n)
-        _, k = closest_pairs(p, m)
-        comparisons.append(k)
-        m_cases.append(m)
 
-    fig = plt.figure(figsize=(4, 3), dpi=300)
-    ax = fig.add_subplot(111)
+    M = utils.combinations(n)
+    if m is None: m = utils.sample_m(n)
 
-    cases = np.array(cases)
-    m_cases = np.array(m_cases)
-    # program = ax.plot(cases, comparisons, color="orange", label="Program Time")
-    program = ax.scatter(cases, comparisons, marker=".", linewidths=0.1, color="#66ABF7", label="Program Time")
-    m_log_m = ax.plot(cases, m_cases*np.log2(m_cases), color="#F76666", label="M log M Time")
-        
-    fig.suptitle("Time Complexity Analysis", fontsize=10, fontweight='normal', alpha=0.5, y=0.96)
-    ax.set_ylabel("Comparisons", fontweight="normal", alpha=0.5, fontsize="x-small")
-    ax.set_xlabel("Number of Points", fontweight="normal", alpha=0.5, fontsize="x-small")
-    ax.tick_params(axis='both', which='major', labelsize=3)
-    ax.legend(loc=1, prop={'size': 4})
+    print(f"\nRETURN THE {m} CLOSEST PAIRS OF THE FOLLOWING {n} POINTS ({M} possible pairs):\n")
+    print(p)
+    print()
 
-    fig.canvas.draw()
-    fig.savefig(f"worst_case_{cases[-1]+1}.png")
-    
-    return
-    
+    ans, comp = closest_pairs(p, m)
 
-def test_values_of_m(n=100):
-    p = utils.sample_p(n)
-    cases = range(10,n+1,5)
-    M_comparisons = []
-    M_3_4_comparisons = []
-    M_2_comparisons = []
-    M_4_comparisons = []
-    M_8_comparisons = []
-    M_cases = []
-    for n in cases:
-        p = utils.sample_p(n)
-        M = utils.combinations(n)
-        M_cases.append(M)
-
-        _, k = closest_pairs(p, M)
-        M_comparisons.append(k)
-
-        _, k = closest_pairs(p, 3*M//4)
-        M_3_4_comparisons.append(k)
-
-        _, k = closest_pairs(p, M//2)
-        M_2_comparisons.append(k)
-
-        _, k = closest_pairs(p, M//4)
-        M_4_comparisons.append(k)
-
-        _, k = closest_pairs(p, M//8)
-        M_8_comparisons.append(k)
-
-    fig = plt.figure(figsize=(4, 3), dpi=300)
-    ax = fig.add_subplot(111)
-
-    cases = np.array(cases)
-    M_cases = np.array(M_cases)
-    M_ = ax.scatter(cases, M_comparisons, marker=".", edgecolors=None, linewidths=0.001, color="#FFB637", label="M")
-    M34 = ax.scatter(cases, M_3_4_comparisons, marker=".", edgecolors=None, linewidths=0.01, color="#FFDD26", label="0.75 M")
-    M2 = ax.scatter(cases, M_2_comparisons, marker=".", edgecolors=None, linewidths=0.01, color="#9EF766", label="0.5 M")
-    M4 = ax.scatter(cases, M_4_comparisons, marker=".", edgecolors=None, linewidths=0.01, color="#66ABF7", label="0.25 M")
-    M8 = ax.scatter(cases, M_8_comparisons, marker=".", edgecolors=None, linewidths=0.01, color="#9A82ED", label="0.125 M")
-    mlogm = ax.plot(cases, M_cases*np.log2(M_cases), color="#F76666", label="M log M Time")
-    m2logm = ax.plot(cases, 2*M_cases*np.log2(M_cases), color="#2F2F2F", label="2M log M Time")
-
-    fig.suptitle("Comparisons for M = bin(n, 2)", fontsize=10, fontweight='normal', alpha=0.5, y=0.96)
-    ax.set_ylabel("Comparisons", fontweight="normal", alpha=0.5, fontsize="x-small")
-    ax.set_xlabel("Number of Points", fontweight="normal", alpha=0.5, fontsize="x-small")
-    ax.tick_params(axis='both', which='major', labelsize=3)
-    ax.legend(loc=1, prop={'size': 4})
-
-
-    fig.canvas.draw()
-    fig.savefig(f"m_analysis.png")
-
-    return
-    
-    TEAM_COLORS = {
-        "blue": "#66ABF7",
-        "red": "#F76666",
-        "neutral": "#BDBDBD",
-        "green": "#9EF766",
-        "purple": "#9A82ED",
-        "orange": "#FFB637",
-        "yellow": "#FFDD26",
-        "pink": "#FBAFF9",
-        "black": "#2F2F2F",
-    }
-
-
-
-
-'''
-m is significant because its maximum value b = bin(n,2) represents the maximum
-number of unique pairs of points in our dataset p. We must loop through at least
-b pairs in order to solve the problem. Looping any more than b times would be wasteful. 
-
-Since our heap insert method leads to full levels at each depth of the heap,
-once we fill enough levels to capture hold at least m elements, we can drop
-nodes that are heapified down beyond that depth. This keeps our tree at a
-max depth of log2(m) as opposed to log2(n*c), where c = bin(n, 2) and
-1 ≤ m ≤ c. 
-
-
-numpy used for logarithm, sqrt, arange, and random
-
-'''
+    print(f"\nPERFORMED {comp} COMPARISONS\n")
+    print("SORTED CLOSEST PAIRS: (dist, point_1, point_2)")
+    for node in ans:
+        print(node)
 
 
 
 if __name__ == "__main__":
 
+    ### Library for adding filepaths as command line arguments
     import argparse
+    parser = argparse.ArgumentParser(description="Encode/Decode using Huffman Coding")
+    parser.add_argument('--n', '-n', type=int, default=100,
+                        help='Number of random (x,y) points to generate.')
+    parser.add_argument('--m', '-m', type=int, default=None,
+                        help='Number of closest pairs of points to return, randomly sampled by default')
+    parser.add_argument('--simple', '-s', type=bool, default=False,
+                        help='Make input points very simple for debugging.')
+    args,_ = parser.parse_known_args()
+    ### 
 
-    21_898_889
-
-    n = 10
-    # n = 100
-    p = utils.sample_p(n)
-    # p = utils.sample_p_flat(n)
-    # m = utils.sample_m(n)
-    m = utils.combinations(n)
-    # m = 10
-
-    ans, comp = closest_pairs(p, m)
-    t = [a.dist for a in ans]
-
-    # test_worst_case(100)
-    test_values_of_m(300)
-
-
-
-
-
-
-
-
+    main(args)

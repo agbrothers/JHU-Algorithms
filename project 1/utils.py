@@ -48,8 +48,8 @@ def sample_m(n):
 
 def sample_p_flat(n):
     zeros = np.zeros(shape=(n, 1))
-    ints  = np.arange(n)[:,None] + np.round(np.random.rand(n,1), 1)
-    return np.concatenate((zeros, ints), axis=-1)
+    ints  = np.arange(n)[:,None] #+ np.round(np.random.rand(n,1), 1)
+    return np.concatenate((zeros, ints), axis=-1) ** 2
 
 ## INPUT/OUTPUT FUNCTIONS
 def read(filepath):
