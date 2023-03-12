@@ -1,0 +1,91 @@
+
+GREYSON BROTHERS - Foundations of Algorithms HW1
+
+
+1. a) 
+
+    This algorithm steps through each item in the array iteratively and compares 
+    the search key on each step. In the best case, the item being searched for is 
+    at index 1 in the array, meaning the search takes only 1 iteration. Worst case, 
+    the item being searched for isn't in the array which would take n iterations. 
+    Average case is n/2 iterations. 
+
+    Worst case implies time complexity of O(n)
+
+
+    b)
+
+    Binary search assumes array A is already sorted. Each iteration discards half 
+    of the search space, implying a worst case log2(n) comparisons when A does not 
+    contain the search key x. Best case, we still have log2(n) comparisons, as there
+    is no early stopping condition if A[i] or A[j] is x. This also makes performance
+    invariant to the location of x in A, unlike linear search. 
+
+    Binary search has time complexity of O(log n)
+
+
+2.  T(n) = 3T(n/2) + n lg n
+
+    Using the Master Method
+    a = 3
+    b = 2
+    k = 1
+    p = 1
+
+    log2(3) = 1.58496 > 1 = k implies that the first term dominates as n approaches
+                              infinity, so by the Master Method, our time complexity 
+                              is strictly bounded by Θ(n^log2(3))
+    
+3. T(n) = T(sqrt(n)) + 1
+
+    Assuming that our function operates on sets of size n, sqrt(n) must be an integer.
+    So we will assume n = 2^k
+
+    We have T(n) = T(sqrt(n)) + 1
+                 = T(n^1/2) + 1
+                 = T(n^1/4) + 2
+                 = T(n^1/8) + 3
+                 = T(n^1/16) + 4
+                 ...
+                 = T(n^1/(2^i)) + i
+
+    So T(2^k) = T(2^(k/(2^i))) + i
+            
+    Let 1 = k/(2^i) => k = 2^i 
+                    => i = log2(k)
+                    => i = log2(log2(n))
+
+    Thus time complexity of T(n) = T(sqrt(n)) + 1 must be strictly bounded by
+    Θ(log2(log2(n)))
+    
+4. T (n) = 2T(n/3 + 1) + n
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+n*k + n log (n/k) =  n log n
+k + log(n/k) = log n
+k + log n - log k = log n
+k - log k = 0
+
+k = log k
+
+
+
+
+
+
+
+
+
+Verify answers with substitution
