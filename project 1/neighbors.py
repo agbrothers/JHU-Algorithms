@@ -56,6 +56,9 @@ class Heap:
         if DEBUG: assert self.depth <= self.max_depth
 
     def get_root(self):
+        return self.array[0]
+
+    def extract_root(self):
         if DEBUG: start = self.comparisons
         if self.empty(): raise Exception("ERROR: Can't get min from an empty heap!")
         ## RETURN ROOT NODE
@@ -123,9 +126,9 @@ class MaxHeap(Heap):
         self.comparisons += 1
         return self.array[parent_idx] < self.array[child_idx]
 
-    def get_root(self):
+    def extract_root(self):
         if DEBUG: mx = max(self.array)
-        max_node = super().get_root()
+        max_node = super().extract_root()
         if DEBUG: assert max_node == mx
         return max_node
 
@@ -149,9 +152,9 @@ class MinHeap(Heap):
         self.array[parent_idx].idx = parent_idx
         self.array[child_idx].idx = child_idx
 
-    def get_root(self):
+    def extract_root(self):
         if DEBUG: mn = min(self.array)
-        min_node = super().get_root()
+        min_node = super().extract_root()
         if DEBUG: assert min_node == mn
         return min_node
 
@@ -170,7 +173,7 @@ def closest_pairs(p, m):
     assert m <= utils.combinations(n), "ERROR: m is greater than the number of possible unique pairs of points"
 
     ## COMPUTE DIST BETWEEN EACH COMBINATION OF POINTS
-    ## T(n) = \sum(n-1) -> M lg M  operation per step
+    ## T(n) = M log m 
     for i in trange(n):  # O(M log2 M) -> O(M log2 m) 
 
         for j in range(i+1,n):
@@ -180,35 +183,41 @@ def closest_pairs(p, m):
             ## TRACK COMPARISONS
             comparisons += 1
             ## CONSTRUCT NODE
-            node = Node(dist, p[i], p[j])
+            new_node = Node(dist, p[i], p[j])
             ## INSERT NODE INTO HEAP
 
-            min_start = min_heap.comparisons
-            max_start = max_heap.comparisons
+            if DEBUG: min_start = min_heap.comparisons
+            if DEBUG: max_start = max_heap.comparisons
 
             ## WHEN > m ITEMS IN THE MIN HEAP, USE THE MAX HEAP 
             ## TO GET THE INDEX OF THE MIN HEAP'S LARGEST NODE 
             ## AND REPLACE IT WITH THE NEW NODE
             insert_idx = None
             if min_heap.size >= m:
-                max_node = max_heap.get_root()
+                ## IF THE NEW NODE IS THE LARGEST NODE, SKIP IT
+                comparisons += 1
+                if max_heap.get_root() < new_node: continue
+                ## OTHERWISE
+                max_node = max_heap.extract_root()
                 insert_idx = max_node.idx
-                assert max_heap.comparisons - max_start < 2*np.log2(m)
-                max_start = max_heap.comparisons
+                if DEBUG: assert max_heap.comparisons - max_start < 2*np.log2(m)
+                if DEBUG: max_start = max_heap.comparisons
+
+            max_heap.insert(new_node) 
+            if DEBUG: assert max_heap.comparisons - max_start < np.log2(m)
 
             ## MAY WANT TO INSERT THE NEW NODE INTO THE MAX HEAP AFTERWARDS
             ## BOTH HEAPS CONTAIN ALL OF THE SAME NODES
-            max_heap.insert(node) 
-            min_heap.insert(node, insert_idx) 
-            assert min_heap.comparisons - min_start < np.log2(m)
-            assert max_heap.comparisons - max_start < np.log2(m)
+            min_heap.insert(new_node, insert_idx) 
+            if DEBUG: assert min_heap.comparisons - min_start < np.log2(m)
 
     ## GET THE M CLOSEST PAIRS FROM THE HEAP
     pairs = []
-    ## T(n) = m -> log m operations per step
-    for i in trange(m): # O(m log2 M) -> O(m log2 m)
-        node = min_heap.get_root()  ## log2 m
-        # pairs.append((node.p1, node.p2))
+    ## T(n) = 2m log m 
+    for i in trange(m): ## Naïve O(m log2 M) -> Improved O(m log2 m)
+        min_start = min_heap.comparisons
+        node = min_heap.extract_root()  ## log2 m
+        if DEBUG: assert min_heap.comparisons - min_start < 2*np.log2(m)
         pairs.append(node)
 
     comparisons += min_heap.comparisons
